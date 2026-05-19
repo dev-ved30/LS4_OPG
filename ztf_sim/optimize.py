@@ -86,14 +86,16 @@ def night_optimize(df_metric, df, requests_allowed, time_limit=30*u.second,
     # extra columns floating around cause problems
     filter_ids = [fid for fid in filter_ids if fid != '']
 
-    # flatten the metric dataframe to make it easier to work with 
-    df_metric_local = df_metric.copy()
-    df_metric_local['request_id'] = df_metric_local.index
+    # flatten the metric dataframe to make it easier to work with.
+    # Using stack() is more robust than melt() for MultiIndex columns in
+    # recent pandas releases.
+    dft = df_metric.stack(level=[0, 1]).reset_index()
+    dft.columns = ['request_id', 'slot', 'metric_filter_id', 'metric']
 
-    # make a "tidy" dataframe with one row per (request, slot, filter)
-    dft = pd.melt(df_metric_local,id_vars='request_id',
-        var_name=['slot','metric_filter_id'],
-        value_name='metric')
+    df_metric_local = df_metric.copy().reset_index()
+    if 'request_id' not in df_metric_local.columns:
+        first_col = df_metric_local.columns[0]
+        df_metric_local = df_metric_local.rename(columns={first_col: 'request_id'})
     # get n_reqs by fid
     n_reqs_cols = ['n_reqs_{}'.format(fid) for fid in filter_ids]
     n_reqs_cols.extend(['program_id','subprogram_name',

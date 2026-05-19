@@ -393,7 +393,12 @@ class Scheduler(object):
             queue['total_time'] = (queue['exposure_time'] + 
                 READOUT_TIME.to(u.second).value)*queue['n_repeats']
             net = queue[['program_id','total_time']].groupby('program_id').agg(np.sum)
-            count_equivalent = np.round(net['total_time']/(EXPOSURE_TIME + READOUT_TIME).to(u.second).value).astype(int).to_dict()
+            count_equivalent = (
+                np.round(net['total_time'] / (EXPOSURE_TIME + READOUT_TIME).to(u.second).value)
+                .fillna(0)
+                .astype(int)
+                .to_dict()
+            )
             for k, v in count_equivalent.items():
                 timed_obs[k] += v
 

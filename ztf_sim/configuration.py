@@ -2,6 +2,7 @@
 
 import pathlib
 import json
+import logging
 import numpy as np
 import astropy.units as u
 from .ObservingProgram import ObservingProgram
@@ -9,6 +10,9 @@ from .Fields import Fields
 from .constants import PROGRAM_NAMES, PROGRAM_NAME_TO_ID, EXPOSURE_TIME, TIME_BLOCK_SIZE
 from .QueueManager import GreedyQueueManager, QueueEmptyError, GurobiQueueManager, ListQueueManager
 from .field_selection_functions import *
+
+
+logger = logging.getLogger(__name__)
 
 
 class Configuration(object):
@@ -238,7 +242,8 @@ class QueueConfiguration(Configuration):
         Raises
         ------
         ValueError
-            If a ``field_ids`` entry is not a valid ZTF field ID.
+            If a program has a ``field_ids`` list but none of those IDs are
+            valid in the loaded field grid.
         AssertionError
             If a program provides more than one field source, or if a
             ``field_selection_function`` name is not defined.
@@ -252,10 +257,25 @@ class QueueConfiguration(Configuration):
             assert(('field_ids' in prog) + ('field_selections' in prog) + 
                     ('field_selection_function' in prog) == 1)
             if 'field_ids' in prog:
-                field_ids = prog['field_ids']
-                for field_id in field_ids:
-                    if field_id not in f.fields.index:
-                        raise ValueError(f'Input field_id {field_id} is not valid')
+                input_field_ids = prog['field_ids']
+                valid_field_ids = [fid for fid in input_field_ids
+                                   if fid in f.fields.index]
+                invalid_field_ids = [fid for fid in input_field_ids
+                                     if fid not in f.fields.index]
+                if invalid_field_ids:
+                    logger.warning(
+                        "Program %s/%s: dropping %d invalid field_ids not present "
+                        "in current field grid (example: %s)",
+                        prog.get('program_name'),
+                        prog.get('subprogram_name'),
+                        len(invalid_field_ids),
+                        invalid_field_ids[:10])
+                if len(valid_field_ids) == 0:
+                    raise ValueError(
+                        f"Program {prog.get('program_name')}/"
+                        f"{prog.get('subprogram_name')} has no valid field_ids "
+                        "for the current field grid")
+                field_ids = valid_field_ids
                 field_selection_function = None
             elif 'field_selections' in prog: 
                 field_ids = f.select_field_ids(**prog['field_selections'])
@@ -270,6 +290,10 @@ class QueueConfiguration(Configuration):
                     assert(field_selection_function in globals())
             if 'nobs_range' not in prog:
                 prog['nobs_range'] = None
+            if 'field_selection_kwargs' not in prog:
+                prog['field_selection_kwargs'] = {}
+            else:
+                assert isinstance(prog['field_selection_kwargs'], dict)
             if 'intranight_gap_min' not in prog:
                 prog['intranight_gap_min'] = TIME_BLOCK_SIZE
             else:
@@ -293,7 +317,8 @@ class QueueConfiguration(Configuration):
                                   nobs_range = prog['nobs_range'],
                                   filter_choice=prog['filter_choice'],
                                   active_months=prog['active_months'],
-                                  field_selection_function = field_selection_function)
+                                  field_selection_function = field_selection_function,
+                                  field_selection_kwargs = prog['field_selection_kwargs'])
             OPs.append(OP)
 
         return OPs

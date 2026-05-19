@@ -261,7 +261,7 @@ class ObsLogger(object):
 
         sun = coord.get_sun(exposure_start)
         sun_altaz = skycoord_to_altaz(sun, exposure_start)
-        moon = coord.get_moon(exposure_start, P48_loc)
+        moon = coord.get_body('moon', exposure_start, location=P48_loc)
         moon_altaz = skycoord_to_altaz(moon, exposure_start)
 
         # WORKING AROUND a bug in sc.separation(moon)!
@@ -301,6 +301,15 @@ class ObsLogger(object):
             request['target_total_requests_tonight']
         record['metricValue'] = request['target_metric_value']
         record['subprogram'] = request['target_subprogram_name'] 
+
+        # Pandas cannot reliably build a row from Astropy Quantity scalars.
+        # Normalize any unit-bearing values to plain Python scalars first.
+        for key, value in list(record.items()):
+            if hasattr(value, 'unit') and hasattr(value, 'to_value'):
+                try:
+                    record[key] = value.to_value()
+                except Exception:
+                    record[key] = np.asarray(value).item()
 
         record_row = pd.DataFrame(record,index=[uuid.uuid1().hex])
 
@@ -381,7 +390,14 @@ class ObsLogger(object):
 
         # add readout overhead (but not slew)
         total_time = total_exposure_time + count_nobs * READOUT_TIME.to(u.second).value
-        count_equivalent = np.round(total_time/(EXPOSURE_TIME + READOUT_TIME).to(u.second).value).astype(int).to_dict()
+        # Some grouped summaries can be empty or partially missing when a
+        # program had no observations in a window; keep the conversion robust.
+        count_equivalent = (
+            np.round(total_time / (EXPOSURE_TIME + READOUT_TIME).to(u.second).value)
+            .fillna(0)
+            .astype(int)
+            .to_dict()
+        )
 
         # make this a defaultdict so we get zero values for new programs
         return defaultdict(int, count_equivalent)
@@ -613,4 +629,3 @@ class ObsLogger(object):
                 ['requestID', 'propID', 'fieldID', 
                     'fieldRA', 'fieldDec', 'filter', 'expMJD', 'visitExpTime',
                     'airmass', 'subprogram']]
-

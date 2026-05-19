@@ -1,4 +1,4 @@
-"""Routines for working with the ZTF discrete field grid"""
+"""Routines for working with the LS4 discrete field grid."""
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ from .constants import slew_time
 
 
 class Fields(object):
-    """Object providing convenience methods for the ZTF discrete field grid.
+    """Object providing convenience methods for the LS4 discrete field grid.
 
     Provides coordinate lookups, nightly altitude/azimuth precomputation,
     sky-limited observability estimates, and telescope-overhead time
@@ -60,8 +60,8 @@ class Fields(object):
     def _load_fields(self, field_filename):
         """Read the field grid file and populate ``self.fields``.
 
-        Drops fields below Dec = -32° for computational speed. Assigns a
-        ``grid_id`` (0–3) based on the numeric range of the field ID.
+        Loads all fields from the configured field file. LS4 currently uses a
+        single primary grid, so every field is assigned ``grid_id = 0``.
 
         Parameters
         ----------
@@ -77,26 +77,8 @@ class Fields(object):
             sep='\s+',usecols=['field_id','ra','dec', 'l','b', 
                 'ecliptic_lon', 'ecliptic_lat'],index_col='field_id',
             skiprows=1)
-
-
-        # drop fields below dec of -32 degrees for speed
-        # (grid_id = 0 has a row at -31.5)
-        df = df[df['dec'] >= -32]
-
-        # label the grid ids
-        grid_id_boundaries = \
-            {0: {'min':1,'max':999},
-             1: {'min':1001,'max':1999},
-             2: {'min':2001,'max':2999},
-             3: {'min':3001,'max':3999}}
-
-        # intialize with a bad int value
-        df['grid_id'] = 99
-
-        for grid_id, bounds in list(grid_id_boundaries.items()):
-            w = (df.index >= bounds['min']) &  \
-                    (df.index <= bounds['max'])
-            df.loc[w,'grid_id'] = grid_id
+        # LS4 currently uses one field grid for the full primary survey.
+        df['grid_id'] = 0
 
         self.fields = df
         self.field_coords = self._field_coords()
@@ -296,7 +278,11 @@ class Fields(object):
             coord = P48_slew_pars[axis]['coord']
             dangle = np.abs(df[coord] - current_coord)
             angle = np.where(dangle < (360. - dangle), dangle, 360. - dangle)
-            slews_by_axis[axis] = slew_time(axis, angle * u.deg)
+            slews_by_axis[axis] = slew_time(axis, angle * u.deg).to(u.second).value
+
+        # Convert the readout term to plain seconds so pandas does not try to
+        # coerce Astropy quantities into a dense object column.
+        slews_by_axis['readout'] = READOUT_TIME.to(u.second).value
 
         dfslews = pd.DataFrame(slews_by_axis, index=df.index)
 
@@ -337,7 +323,8 @@ class Fields(object):
         ecliptic_lat_range : list of float or None, optional
             Ecliptic latitude range [min, max] in degrees.
         grid_id : int or None, optional
-            Select only fields belonging to this grid ID (0–3).
+            Select only fields belonging to this grid ID. LS4 currently
+            uses ``grid_id = 0`` for the primary survey grid.
         observable_hours_range : list of float or None, optional
             Observable hours range [min, max]. Requires
             ``compute_observability()`` to have been called first.

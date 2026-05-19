@@ -42,7 +42,8 @@ class ObservingProgram(object):
                  nobs_range=None,
                  filter_choice='rotate',
                  active_months='all',
-                 field_selection_function=None):
+                 field_selection_function=None,
+                 field_selection_kwargs=None):
         """Initialise an observing program.
 
         Exactly one of *field_ids* and *field_selection_function* must be
@@ -96,6 +97,9 @@ class ObservingProgram(object):
             ``'EP-bypass'`` signals that this program is handled by
             ``make_nightly_timed_blocks`` and should return an empty list.
             Mutually exclusive with *field_ids*.
+        field_selection_kwargs : dict or None, optional
+            Extra keyword arguments passed to the field-selection function.
+            Useful for configurable footprints or nested subsets.
 
         Raises
         ------
@@ -131,6 +135,7 @@ class ObservingProgram(object):
             self.active_months = 'all'
 
         self.field_selection_function = field_selection_function
+        self.field_selection_kwargs = field_selection_kwargs or {}
 
     def assign_nightly_requests(self, time, fields, obs_log,
             other_program_fields,
@@ -224,7 +229,9 @@ class ObservingProgram(object):
                 return []
             try:
                 selection_function = globals()[self.field_selection_function]
-                field_ids = selection_function(time, obs_log, other_program_fields, fields, skymaps)
+                field_ids = selection_function(
+                    time, obs_log, other_program_fields, fields, skymaps,
+                    **self.field_selection_kwargs)
                 self.logger.info(f'Program ID {self.program_id}, subprogram {self.subprogram_name}: selected {len(field_ids)} fields')
                 self.logger.debug(f'    {field_ids}')
             except Exception as e:

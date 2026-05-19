@@ -21,7 +21,6 @@ import logging
 from ..constants import READOUT_TIME, P48_Observer
 
 from ..Fields import Fields
-from ..constants import READOUT_TIME
 from ..configuration import Configuration
 from ..optimize import check_limits_and_solve_TSP
 from ..QueueManager import ListQueueManager

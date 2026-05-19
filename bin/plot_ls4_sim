@@ -1,0 +1,121 @@
+#!/usr/bin/env python
+"""Plot basic diagnostics for an LS4 simulation run.
+
+This script reads the `Summary` table from an LS4 simulation SQLite database
+and writes a few quick-look PNGs:
+
+- sky pointings in an Aitoff projection
+- observations per night
+- filter usage over time
+"""
+
+import argparse
+import collections
+import os
+import sqlite3
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+def load_summary(db_path):
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    tables = {row[0] for row in cur.execute(
+        "select name from sqlite_master where type='table'")}
+    if "Summary" not in tables:
+        raise ValueError("Database has no Summary table")
+    rows = cur.execute("select * from Summary order by expMJD").fetchall()
+    return [dict(row) for row in rows]
+
+
+def plot_sky(rows, outpath):
+    ra = np.array([r["fieldRA"] for r in rows], dtype=float)
+    dec = np.array([r["fieldDec"] for r in rows], dtype=float)
+    ra_deg = np.degrees(ra)
+    dec_deg = np.degrees(dec)
+
+    plt.figure(figsize=(10, 5.5))
+    ax = plt.gca()
+    ax.scatter(ra_deg, dec_deg, s=45, c=np.arange(len(rows)),
+               cmap="viridis", alpha=0.9, edgecolors="none")
+    ax.set_xlabel("RA (deg)")
+    ax.set_ylabel("Dec (deg)")
+    ax.set_title("LS4 pointings in RA/Dec")
+    ax.invert_xaxis()
+    ax.grid(True, alpha=0.4)
+    plt.tight_layout()
+    plt.savefig(outpath, dpi=160)
+    plt.close()
+
+
+def plot_nightly_counts(rows, outpath):
+    counts = collections.Counter(int(r["night"]) for r in rows if r["night"] is not None)
+    nights = sorted(counts)
+    values = [counts[n] for n in nights]
+
+    plt.figure(figsize=(10, 4.5))
+    plt.bar(nights, values, width=0.8, color="#1f77b4")
+    plt.xlabel("Night")
+    plt.ylabel("Observations")
+    plt.title("Observations per night")
+    plt.tight_layout()
+    plt.savefig(outpath, dpi=160)
+    plt.close()
+
+
+def plot_filters(rows, outpath):
+    mjd = np.array([r["expMJD"] for r in rows], dtype=float)
+    filters = [r["filter"] for r in rows]
+    unique = sorted(set(filters))
+    palette = {f: c for f, c in zip(unique, plt.cm.tab10.colors)}
+
+    plt.figure(figsize=(10, 4.5))
+    for f in unique:
+        w = [i for i, val in enumerate(filters) if val == f]
+        plt.scatter(mjd[w], [f] * len(w), s=45, color=palette[f], label=f)
+    plt.xlabel("MJD")
+    plt.ylabel("Filter")
+    plt.title("Filter usage over time")
+    plt.legend(title="Filter", loc="best")
+    plt.tight_layout()
+    plt.savefig(outpath, dpi=160)
+    plt.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Plot an LS4 simulation run.")
+    parser.add_argument("database", help="Path to the SQLite simulation database")
+    parser.add_argument("-o", "--output-dir", default=".",
+                        help="Directory to write PNG plots")
+    parser.add_argument("--prefix", default="ls4_run",
+                        help="Filename prefix for plots")
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.database):
+        parser.error(f"database not found: {args.database}")
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    rows = load_summary(args.database)
+    if not rows:
+        print("Summary table is empty; nothing to plot.")
+        return
+
+    sky_path = os.path.join(args.output_dir, f"{args.prefix}_sky.png")
+    night_path = os.path.join(args.output_dir, f"{args.prefix}_nights.png")
+    filter_path = os.path.join(args.output_dir, f"{args.prefix}_filters.png")
+
+    plot_sky(rows, sky_path)
+    plot_nightly_counts(rows, night_path)
+    plot_filters(rows, filter_path)
+
+    print(f"Wrote {sky_path}")
+    print(f"Wrote {night_path}")
+    print(f"Wrote {filter_path}")
+
+
+if __name__ == "__main__":
+    main()

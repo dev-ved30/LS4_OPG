@@ -683,6 +683,11 @@ def nightly_blocks(time, time_block_size=TIME_BLOCK_SIZE):
     block_end = block_index(morning_twilight,
                             time_block_size=time_block_size)
 
+    # block_index returns numpy arrays; nightly bounds here are scalar
+    # endpoints for one night.
+    block_start = int(np.atleast_1d(block_start)[0])
+    block_end = int(np.atleast_1d(block_end)[0])
+
     blocks = np.arange(block_start, block_end + 1, 1)
     times = block_index_to_time(blocks, time, where='mid')
 
@@ -814,7 +819,7 @@ def compute_limiting_mag(df, time, sky, filter_id=None):
     sc = coord.SkyCoord(df['ra'], df['dec'], frame='icrs', unit='deg')
     sun = coord.get_sun(time)
     sun_altaz = skycoord_to_altaz(sun, time)
-    moon = coord.get_moon(time, location=P48_loc)
+    moon = coord.get_body('moon', time, location=P48_loc)
     moon_altaz = skycoord_to_altaz(moon, time)
     df.loc[:, 'moonillf'] = astroplan.moon.moon_illumination(time)
     
@@ -829,7 +834,8 @@ def compute_limiting_mag(df, time, sky, filter_id=None):
 
     # compute sky brightness
     # only have values for reasonable altitudes (set by R20_absorbed...)
-    wup = df['altitude'] >= airmass_to_altitude(MAX_AIRMASS) 
+    min_altitude_deg = airmass_to_altitude(MAX_AIRMASS).to(u.deg).value
+    wup = df['altitude'] >= min_altitude_deg
     df.loc[wup, 'sky_brightness'] = sky.predict(df[wup])
 
     # compute seeing at each pointing
@@ -1010,7 +1016,8 @@ def _ptf_to_sqlite():
 
     # for some reason the night values from the db are not monotonic in MJD
     # make my own versions
-    df['night'] = np.floor(df['expMJD'] - 54847).astype(int)
+    # Guard against any non-finite rows that may survive upstream joins.
+    df['night'] = np.floor(df['expMJD'] - 54847).fillna(0).astype(int)
 
     df_write_to_sqlite(df, 'ptf', tablename='Summary')
     return df

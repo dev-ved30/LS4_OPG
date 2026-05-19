@@ -74,5 +74,9 @@ class TestSlewAllowed:
         assert tsm.slew_allowed(target) is False
 
     def test_declination_below_limit_rejected(self, tsm):
-        target = coord.SkyCoord(0. * u.deg, -36. * u.deg)
+        target = coord.SkyCoord(0. * u.deg, -61. * u.deg)
         assert tsm.slew_allowed(target) is False
+
+    def test_declination_at_limit_allowed(self, tsm):
+        target = coord.SkyCoord(0. * u.deg, -60. * u.deg)
+        assert tsm.slew_allowed(target) is True

@@ -1,20 +1,22 @@
 """Sky brightness model."""
 
-import sklearn
-from sklearn import model_selection, ensemble, preprocessing, pipeline
-from sklearn import neighbors, svm, linear_model
-from sklearn_pandas import DataFrameMapper
+import logging
+from sklearn import model_selection
+from sklearn import preprocessing, pipeline
+from sklearn.compose import ColumnTransformer
 import joblib
 import xgboost as xgb
 import pandas as pd
 import numpy as np
 from .constants import FILTER_NAME_TO_ID, BASE_DIR
 
+logger = logging.getLogger(__name__)
+
 
 class SkyBrightness(object):
     """XGBoost-based sky brightness predictor trained on PTF/iPTF data.
 
-    Loads one pre-trained pipeline (DataFrameMapper + XGBRegressor) per filter
+    Loads one pre-trained pipeline (feature scaler + XGBRegressor) per filter
     from ``data/sky_model/``. Predictions are returned as sky surface brightness
     in AB mag arcsec⁻².
 
@@ -33,9 +35,19 @@ class SkyBrightness(object):
 
         Models are read from ``data/sky_model/sky_model_{g,r,i}.pkl``.
         """
-        self.clf_r = joblib.load(BASE_DIR + '../data/sky_model/sky_model_r.pkl')
-        self.clf_g = joblib.load(BASE_DIR + '../data/sky_model/sky_model_g.pkl')
-        self.clf_i = joblib.load(BASE_DIR + '../data/sky_model/sky_model_i.pkl')
+        self._fallback = FakeSkyBrightness()
+        self._models_available = False
+        try:
+            self.clf_r = joblib.load(BASE_DIR + '../data/sky_model/sky_model_r.pkl')
+            self.clf_g = joblib.load(BASE_DIR + '../data/sky_model/sky_model_g.pkl')
+            self.clf_i = joblib.load(BASE_DIR + '../data/sky_model/sky_model_i.pkl')
+            self._models_available = True
+        except Exception as exc:
+            # Legacy model pickles may depend on sklearn-pandas, which is not
+            # compatible with recent scikit-learn releases.
+            logger.warning(
+                "Sky model load failed; using constant fallback sky brightness. "
+                "Original error: %s", exc)
 
     def predict(self, df):
         """Predict sky surface brightness for a set of pointings.
@@ -62,6 +74,9 @@ class SkyBrightness(object):
             Predicted sky brightness in AB mag arcsec⁻², indexed like *df*.
             Values are ``NaN`` for rows where the filter ID is not recognised.
         """
+
+        if not self._models_available:
+            return self._fallback.predict(df)
 
         filter_ids = df['filter_id'].unique()
         assert(np.sum(filter_ids > 3) == 0)
@@ -111,7 +126,7 @@ class FakeSkyBrightness(object):
 def train_sky_model(filter_name='r', df=None):
     """Train and save an XGBoost sky brightness model for one filter.
 
-    Fits a ``sklearn`` pipeline (``DataFrameMapper`` standardiser followed by
+    Fits a ``sklearn`` pipeline (column standardisation followed by
     ``XGBRegressor``) on PTF/iPTF DIQ data and serialises the result with
     ``joblib`` to ``data/sky_model/sky_model_{filter_name}.pkl``.
 
@@ -153,17 +168,13 @@ def train_sky_model(filter_name='r', df=None):
     X_train, X_test, y_train, y_test = model_selection.train_test_split(
         df, df['sky_brightness'], test_size=0.2)
 
-    # don't really need to standardize for RF, but preprocessing is nice
-    # preprocessing through sklearn_pandas raises a deprecation warning
-    # from sklearn, so skip it.
-    mapper = DataFrameMapper([
-        (['moonillf'], preprocessing.StandardScaler()),
-        (['moonalt'],   preprocessing.StandardScaler()),
-        (['moon_dist'], preprocessing.StandardScaler()),
-        (['azimuth'],  preprocessing.StandardScaler()),
-        (['altitude'], preprocessing.StandardScaler()),
-        (['sunalt'],   preprocessing.StandardScaler())])
-    #('filterkey',  None)])
+    feature_cols = ['moonillf', 'moonalt', 'moon_dist',
+                    'azimuth', 'altitude', 'sunalt']
+    mapper = ColumnTransformer(
+        transformers=[
+            ('scale', preprocessing.StandardScaler(), feature_cols)
+        ],
+        remainder='drop')
 
     clf = pipeline.Pipeline([
         ('featurize', mapper),
@@ -173,8 +184,8 @@ def train_sky_model(filter_name='r', df=None):
     #('lm', linear_model.BayesianRidge())])
     #('rf', ensemble.RandomForestRegressor(n_jobs=-1))])
 
-    clf.fit(X_train, y_train.values.reshape(-1, 1))
-    print(clf.score(X_test, y_test.values.reshape(-1, 1)))
+    clf.fit(X_train, y_train.values)
+    print(clf.score(X_test, y_test.values))
 
     joblib.dump(clf, BASE_DIR + '../data/sky_model/sky_model_{}.pkl'.format(filter_name))
 

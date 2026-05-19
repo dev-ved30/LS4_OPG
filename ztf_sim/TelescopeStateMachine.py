@@ -51,7 +51,7 @@ class TelescopeStateMachine(Machine):
 
     def __init__(self, current_time=Time('2018-01-01', scale='utc',
                                          location=P48_loc),
-                 current_ha=0. * u.deg, current_dec=33.36 * u.deg,
+                 current_ha=0. * u.deg, current_dec=-29.01 * u.deg,
                  current_domeaz=180. * u.deg,
                  current_filter_id=2, filters=FILTER_IDS,
                  current_zenith_seeing=2.0 * u.arcsec,
@@ -66,7 +66,6 @@ class TelescopeStateMachine(Machine):
         current_ha : astropy.units.Quantity, optional
             Starting hour angle. Default is 0 deg (on meridian).
         current_dec : astropy.units.Quantity, optional
-            Starting declination. Default is 33.36 deg (Palomar latitude).
             Starting declination. Default is -29.01 deg (La Silla latitude).
         current_domeaz : astropy.units.Quantity, optional
             Starting dome azimuth. Default is 180 deg (south).
@@ -216,14 +215,14 @@ class TelescopeStateMachine(Machine):
         -------
         bool
             ``True`` if the target is reachable. ``False`` if the target
-            altitude is below 10° or the declination is outside [−35°, +90°].
+            altitude is below 10° or the declination is outside [−60°, +90°].
         """
 
         if (skycoord_to_altaz(target_skycoord, self.current_time).alt
             < (10. * u.deg)):
             return False
 
-        if ((target_skycoord.dec < -35. * u.deg) or
+        if ((target_skycoord.dec < -60. * u.deg) or
                 (target_skycoord.dec > 90. * u.deg)):
             return False
         return True

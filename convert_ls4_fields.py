@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Convert LS4 field grid CSV to ZTF_Fields.txt format
+Convert LS4 field grid CSV to `LS4_Fields.txt` format.
 """
 import pandas as pd
 import numpy as np
@@ -14,7 +14,7 @@ ls4_csv = pd.read_csv('data/LS4_field_grid.csv')
 # You could also use the Field Name if it has numeric format
 ls4_csv['field_id'] = range(1, len(ls4_csv) + 1)
 
-# Rename columns to match ZTF format
+# Rename columns to match the LS4 field file format
 ls4_csv = ls4_csv.rename(columns={'ra_deg': 'ra', 'dec_deg': 'dec'})
 
 # Calculate galactic coordinates (l, b) and ecliptic coordinates
@@ -53,17 +53,17 @@ def is_even_even(field_name):
 ls4_csv = ls4_csv[ls4_csv['Field Name'].apply(is_even_even)]
 print(f"Filtered to {len(ls4_csv)} fields with even_even dither pattern")
 
-# Reorder columns to match ZTF format
+# Reorder columns to match the LS4 field file format
 output_df = ls4_csv[['field_id', 'ra', 'dec', 'ebv', 'l', 'b', 
                      'ecliptic_lon', 'ecliptic_lat', 'number']]
 
-# Write to file in ZTF format (space-separated, with header comment)
+# Write to file in the same space-separated format used by the field loader
 with open('data/LS4_Fields.txt', 'w') as f:
     f.write('% ID         RA         Dec       Ebv      Gal Long  Gal Lat    Ecl Long  Ecl Lat   Entry\n')
-    # Format each line to match ZTF format
+    # Format each line to match the loader's expected format
     for idx, row in output_df.iterrows():
         f.write(f'{int(row["field_id"]):06d} {row["ra"]:10.5f} {row["dec"]:10.5f} {row["ebv"]:6.2f} '
                 f'{row["l"]:10.4f} {row["b"]:9.4f} {row["ecliptic_lon"]:10.4f} {row["ecliptic_lat"]:8.4f} {int(row["number"]):6d}\n')
 
-print(f"Converted {len(output_df)} LS4 fields to ZTF_Fields.txt format")
+print(f"Converted {len(output_df)} LS4 fields to LS4_Fields.txt format")
 print(f"Output written to: data/LS4_Fields.txt")

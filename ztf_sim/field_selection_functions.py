@@ -25,6 +25,77 @@ msip_cadence = 2
 msip_internight_gap = msip_cadence*u.day
 msip_nobs_per_night = 2
 
+
+def ls4_smoke_selection(time, obs_log, other_program_fields, fields,
+                        skymaps):
+    """Select a tiny LS4-safe field set for smoke testing.
+
+    The goal is to keep the request pool small enough for the size-limited
+    Gurobi license while still choosing fields that are currently visible.
+    """
+
+    # Keep smoke tests inside the current slew/visibility limits so the
+    # simulation can actually record observations.
+    candidate_field_ids = fields.select_field_ids(dec_range=[-60, 90],
+                                                  observable_hours_range=[0.5, 24.])
+    if len(candidate_field_ids) == 0:
+        candidate_field_ids = fields.select_field_ids(
+            observable_hours_range=[0.5, 24.])
+
+    visible_fields = fields.fields.loc[candidate_field_ids].join(fields.observable_hours)
+    visible_fields = visible_fields.loc[visible_fields['observable_hours'] >= 0.5].copy()
+    visible_fields.sort_values(['ra', 'observable_hours'], inplace=True)
+
+    n_smoke_fields = min(24, len(visible_fields))
+    if n_smoke_fields == 0:
+        smoke_field_ids = []
+    else:
+        sample_positions = np.linspace(0, len(visible_fields) - 1, n_smoke_fields, dtype=int)
+        smoke_field_ids = visible_fields.index.to_numpy()[sample_positions].tolist()
+    logger.info(f'LS4 smoke selection: using {len(smoke_field_ids)} fields')
+    return smoke_field_ids
+
+
+def ls4_extragalactic_selection(time, obs_log, other_program_fields, fields,
+                                skymaps, selection=None,
+                                subset_fraction=1.0,
+                                subset_sort_by='ra',
+                                subset_sort_ascending=True):
+    """Select a configurable LS4 extragalactic footprint.
+
+    Parameters
+    ----------
+    selection : dict or None, optional
+        Keyword arguments forwarded to `Fields.select_field_ids`. Typical
+        entries are ``abs_b_range`` and ``dec_range``.
+    subset_fraction : float, optional
+        Fraction of the selected footprint to keep. Useful for nested
+        high-cadence subprograms. Default is 1.0 (keep all fields).
+    subset_sort_by : str, optional
+        Field column used to order the selected footprint before subsetting.
+        Default is ``'ra'``.
+    subset_sort_ascending : bool, optional
+        Sort direction before subsetting. Default is ascending.
+    """
+    selection = selection or {}
+    field_ids = fields.select_field_ids(**selection)
+
+    if len(field_ids) == 0:
+        return []
+
+    if subset_fraction < 1.0:
+        df = fields.fields.loc[field_ids].sort_values(
+            subset_sort_by, ascending=subset_sort_ascending)
+        n_keep = max(1, int(np.round(len(df) * subset_fraction)))
+        field_ids = df.index[:n_keep].tolist()
+    else:
+        field_ids = field_ids.tolist()
+
+    logger.info(
+        'LS4 extragalactic selection: %d fields (fraction=%.3f, selection=%s)',
+        len(field_ids), subset_fraction, selection)
+    return field_ids
+
 def phase_IV_partnership_selection(time, obs_log, other_program_fields, fields,
                              skymaps):
     """Select ZTF fields for the Phase IV collaboration partnership program.

@@ -23,18 +23,18 @@ pd.options.mode.chained_assignment = 'raise'  # default='warn'
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 logging.getLogger("transitions").setLevel(logging.WARNING)
-logging.getLogger("sklearn_pandas").setLevel(logging.WARNING)
+logging.getLogger("sklearn").setLevel(logging.WARNING)
 logging.getLogger("gurobipy").setLevel(logging.INFO)
 logging.getLogger("ztf_sim.field_selection_functions").setLevel(logging.INFO)
 
 
 def simulate(scheduler_config_file, sim_config_file,
-        scheduler_config_path=BASE_DIR + '../../ztf_survey_configuration/',
+        scheduler_config_path=BASE_DIR + '../sims/',
         sim_config_path=BASE_DIR+'../config/',
         output_path=BASE_DIR+'../sims/',
         profile=False, raise_queue_empty=False, fallback=True,
         time_limit=30*u.second):
-    """Run a ZTF survey simulation from start to finish.
+    """Run an LS4 survey simulation from start to finish.
 
     Reads configuration files, initialises the telescope state machine and
     scheduler, then steps through time night by night. Each night the ILP
@@ -55,7 +55,7 @@ def simulate(scheduler_config_file, sim_config_file,
         optionally ``log_name``.
     scheduler_config_path : str, optional
         Directory containing the scheduler JSON configuration. Default is
-        ``../../ztf_survey_configuration/`` relative to the package root.
+        ``../sims/`` relative to the package root.
     sim_config_path : str, optional
         Directory containing the simulation INI configuration. Default is
         ``../config/``.
@@ -277,4 +277,3 @@ def simulate(scheduler_config_file, sim_config_file,
         print(profiler.output_text(str=True, color=True))
         with open(os.path.join(output_path,f'{run_name}_profile.txt'), 'w') as f:
             f.write(profiler.output_text())
-

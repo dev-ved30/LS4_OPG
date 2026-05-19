@@ -10,7 +10,7 @@ class TestFieldsLoading:
         assert fields.fields is not None
 
     def test_field_count_reasonable(self, fields):
-        """ZTF grid has ~1700 fields above dec=-32."""
+        """LS4 primary grid has a bit over 1900 fields."""
         assert len(fields.fields) > 1000
 
     def test_index_is_field_id(self, fields):
@@ -20,13 +20,9 @@ class TestFieldsLoading:
         for col in ['ra', 'dec', 'l', 'b', 'ecliptic_lon', 'ecliptic_lat', 'grid_id']:
             assert col in fields.fields.columns
 
-    def test_dec_cut_applied(self, fields):
-        """Fields below dec=-32 should have been dropped."""
-        assert (fields.fields['dec'] >= -32).all()
-
     def test_grid_ids_valid(self, fields):
-        """All grid_ids should be 0, 1, 2, or 3."""
-        assert set(fields.fields['grid_id'].unique()).issubset({0, 1, 2, 3})
+        """All LS4 grid_ids should be 0."""
+        assert set(fields.fields['grid_id'].unique()) == {0}
 
 
 class TestFieldsSelection:

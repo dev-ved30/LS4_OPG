@@ -1,5 +1,5 @@
 
-# Configuring ztf_sim
+# Configuring ls4_sim
 
 *NOTE THAT THE DOCUMENTATION BELOW IS OUTDATED AND SOME OPTIONS NO LONGER WORK AS DESCRIBED*
 
@@ -75,7 +75,7 @@ Basic parameters are set at the top level.
 
 ## Observing Programs
 
-`ztf_sim` can (in theory) support arbitary sub-surveys, each of which is specified as a component under `observing_programs`.  Each sub-survey is defined by the following elements:
+`ls4_sim` can (in theory) support arbitrary sub-surveys, each of which is specified as a component under `observing_programs`. Each sub-survey is defined by the following elements:
 
 `program_name`: There are three top-level observing programs: `"MSIP"`, `"collaboration"`, and `"Caltech"`, which split the available observing time 40/40/20.  
 
@@ -94,7 +94,11 @@ Basic parameters are set at the top level.
 * `abs_b_range`: Range of absolute Galactic latitude values (e.g., [20,90] to select extragalactic sky) (degrees)
 * `ecliptic_lon_range`: Range of ecliptic longitude values (degrees)
 * `ecliptic_lat_range`: Range of ecliptic latitude values (degrees)
-* `grid_id`: 0 or 1.  If specified, only use fields from the primary or offset pointing grid.
+* `grid_id`: 0. If specified, only use fields from the LS4 primary grid.
+
+`field_selection_function`: Instead of a fixed footprint, a named function in `ztf_sim/field_selection_functions.py` may select fields dynamically each night.
+
+`field_selection_kwargs`: Optional keyword arguments passed to the dynamic field-selection function.  This is useful for configurable footprints and nested subsets, for example a broad extragalactic LEG footprint plus a smaller high-cadence subset.
 
 It is also possible to select fields by the total number of observations (possibly subdivided by filter or programs) and or the last observation date (possibly subdivided by filter or programs).  These are less likely to be used for a new survey configuration.
 

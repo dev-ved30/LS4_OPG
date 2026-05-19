@@ -22,6 +22,7 @@ from .utils import skycoord_to_altaz, seeing_at_pointing
 from .utils import altitude_to_airmass, airmass_to_altitude, RA_to_HA, HA_to_RA
 from .utils import scalar_len, nightly_blocks, block_index, block_index_to_time
 from .utils import block_use_fraction, maximum_altitude, compute_limiting_mag
+from .obsplan import build_obsplan
 
 class QueueEmptyError(Exception):
     """Raised when the nightly queue contains no valid observations.
@@ -321,8 +322,8 @@ class QueueManager(object):
 #        assert(len(self.rp.pool) > 0)
 
         # any specific tasks needed)
-        self._assign_nightly_requests(current_state, 
-                time_limit = time_limit, block_use = block_use)
+            self._assign_nightly_requests(current_state,
+                time_limit=time_limit, block_use=block_use, obs_log=obs_log)
 
         # mark that we've set up the pool for tonight
         self.queue_night = np.floor(current_state['current_time'].mjd) 
@@ -407,7 +408,7 @@ class QueueManager(object):
 
         delta_program_nobs /= divisor
 
-        delta_program_nobs = np.round(delta_program_nobs).astype(int)
+        delta_program_nobs = np.round(delta_program_nobs).fillna(0).astype(int)
 
         return delta_program_nobs
         
@@ -504,7 +505,7 @@ class QueueManager(object):
 
         delta_subprogram_nobs /= divisor
 
-        delta_subprogram_nobs = np.round(delta_subprogram_nobs).astype(int)
+        delta_subprogram_nobs = np.round(delta_subprogram_nobs).fillna(0).astype(int)
 
         return delta_subprogram_nobs
         
@@ -556,7 +557,7 @@ class QueueManager(object):
         self.logger.debug(f"Sum of change in allowed exposures by subprogram: {delta_subprogram_exposures_tonight.reset_index().groupby('program_id').agg(np.sum)}")
         self.logger.info(f'Number of timed observations: {timed_obs_count}')
 
-        dark_time = approx_hours_of_darkness(time)
+        dark_time = float(np.atleast_1d(approx_hours_of_darkness(time).to(u.second).value)[0])
         
         # calculate subprogram fractions excluding list queues and TOOs
         scheduled_subprogram_sum = defaultdict(float)
@@ -574,17 +575,24 @@ class QueueManager(object):
 
             
             program_time_tonight = (
-                dark_time * op.program_observing_time_fraction +  
-                (delta_program_exposures_tonight.loc[op.program_id,'n_obs'] 
-                - timed_obs_count[op.program_id]) * (EXPOSURE_TIME+READOUT_TIME))
+                dark_time * op.program_observing_time_fraction +
+                (delta_program_exposures_tonight.loc[op.program_id, 'n_obs']
+                 - timed_obs_count[op.program_id]) *
+                (EXPOSURE_TIME + READOUT_TIME).to(u.second).value)
 
             subprogram_time_tonight = (
-                program_time_tonight * op.subprogram_fraction / 
+                program_time_tonight * op.subprogram_fraction /
                 scheduled_subprogram_sum[op.program_id])
 
-            n_requests = (subprogram_time_tonight.to(u.min) / 
-                    op.time_per_exposure().to(u.min)).value[0]
-            n_requests = np.round(n_requests).astype(int)
+            n_requests = (
+                subprogram_time_tonight /
+                op.time_per_exposure().to(u.second).value
+            )
+            # n_requests is a scalar here; keep the conversion scalar-safe.
+            if not np.isfinite(n_requests):
+                n_requests = 0
+            else:
+                n_requests = int(np.round(n_requests))
 
             # i_band program balance needs individual tuning due to 
             # longer cadence and filter blocking
@@ -777,7 +785,7 @@ class GurobiQueueManager(QueueManager):
 
     def _assign_nightly_requests(self, current_state,
                                   time_limit=30.*u.second,
-                                  block_use=defaultdict(float)):
+                                  block_use=defaultdict(float), obs_log=None):
         """Run the ILP pre-planning phase for tonight.
 
         Calls `_assign_slots` to compute the Gurobi slot assignment and
@@ -1042,6 +1050,7 @@ class GurobiQueueManager(QueueManager):
         tnow = current_state['current_time']
         yymmdd = tnow.iso.split()[0][2:].replace('-','')
         solution_outfile = f'{BASE_DIR}/../sims/gurobi_solution_{yymmdd}.csv'
+        obsplan_outfile = solution_outfile.replace('.csv', '.obsplan')
 
         before_noon_utc = (tnow.mjd - np.floor(tnow.mjd)) < 0.5
         
@@ -1049,6 +1058,24 @@ class GurobiQueueManager(QueueManager):
         # completed
         if before_noon_utc or (not os.path.exists(solution_outfile)):
             dft.drop(columns=['Yrtf']).to_csv(solution_outfile)
+
+        if before_noon_utc or (not os.path.exists(obsplan_outfile)):
+            obsplan_df = dft.loc[dft['scheduled'], [
+                'ra', 'dec', 'field_id', 'program_id', 'subprogram_name',
+                'filter_id'
+            ]].copy()
+            if len(obsplan_df) > 0:
+                obsplan_df['target'] = obsplan_df.apply(
+                    lambda row: (
+                        f"field_{int(row['field_id']):06d}_"
+                        f"p{int(row['program_id'])}_"
+                        f"{row['subprogram_name']}_"
+                        f"f{int(row['filter_id'])}"
+                    ),
+                    axis=1
+                )
+                build_obsplan(obsplan_df[['ra', 'dec', 'target']],
+                              obsplan_outfile)
 
     def _sequence_requests_in_block(self, current_state):
         """Solve the TSP to order observations within the current time block.
@@ -1305,7 +1332,7 @@ class GreedyQueueManager(QueueManager):
         self.queue_type = 'greedy'
 
     def _assign_nightly_requests(self, current_state,
-            time_limit=30.*u.second, block_use=defaultdict(float)):
+            time_limit=30.*u.second, block_use=defaultdict(float), obs_log=None):
         """Initialise per-night state for the greedy scheduler.
 
         Records the time of the last filter change so that the minimum
@@ -1319,6 +1346,30 @@ class GreedyQueueManager(QueueManager):
         # initialize the time of last filter change
         if self.time_of_last_filter_change is None:
             self.time_of_last_filter_change = current_state['current_time']
+
+        # build tonight's queue once so we can dump a human-readable obsplan
+        # alongside the normal scheduler state
+        self._update_queue(current_state, obs_log)
+
+        if len(self.queue) > 0:
+            tnow = current_state['current_time']
+            yymmdd = tnow.iso.split()[0][2:].replace('-', '')
+            obsplan_outfile = f'{BASE_DIR}/../sims/{self.queue_name}_{yymmdd}.obsplan'
+
+            obsplan_df = self.queue.loc[:, ['ra', 'dec', 'field_id',
+                                            'program_id', 'subprogram_name',
+                                            'filter_id']].copy()
+            obsplan_df['target'] = obsplan_df.apply(
+                lambda row: (
+                    f"field_{int(row['field_id']):06d}_"
+                    f"p{int(row['program_id'])}_"
+                    f"{row['subprogram_name']}_"
+                    f"f{int(row['filter_id'])}"
+                ),
+                axis=1
+            )
+            build_obsplan(obsplan_df[['ra', 'dec', 'target']],
+                          obsplan_outfile)
 
     def _next_obs(self, current_state, obs_log):
         """Return the highest-value observation at the current time step.

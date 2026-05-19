@@ -2,17 +2,17 @@
 #
 # Copyright (C) 2015-17 California Institute of Technology
 
-DESCRIPTION = "ztf_sim: Scheduling library for the Zwicky Transient Facility"
+DESCRIPTION = "ls4_sim: Scheduling library for the LS4 observing program"
 LONG_DESCRIPTION = """\
-Scheduling library for the Zwicky Tranisent Facility
+Scheduling library for the LS4 observing program
 """
 
-DISTNAME = 'ztf_sim'
+DISTNAME = 'ls4_sim'
 MAINTAINER = 'Eric Bellm'
 MAINTAINER_EMAIL = 'ecbellm@uw.edu'
-URL = 'https://github.com/ZwickyTransientFacility/ztf_sim/'
+URL = 'https://github.com/ZwickyTransientFacility/ls4_sim/'
 LICENSE = 'BSD (3-clause)'
-DOWNLOAD_URL = 'https://github.com/ZwickyTransientFacility/ztf_sim/'
+DOWNLOAD_URL = 'https://github.com/ZwickyTransientFacility/ls4_sim/'
 VERSION = '1.0'
 
 try:
@@ -48,13 +48,13 @@ def check_dependencies():
     except ImportError:
         install_requires.append('pandas')
     try:
+        import requests
+    except ImportError:
+        install_requires.append('requests')
+    try:
         import sklearn
     except ImportError:
         install_requires.append('scikit-learn')
-    try:
-        import sklearn_pandas
-    except ImportError:
-        install_requires.append('sklearn-pandas')
     try:
         import xgboost
     except ImportError:
@@ -89,7 +89,15 @@ if __name__ == "__main__":
         include_package_data=True,
         zip_safe=False,
         packages=['ztf_sim'],
-        scripts=['bin/run_ztf_sim', 'bin/analyze_ztf_sim', 'bin/load_ztf_sim'],
+        scripts=[
+            'bin/run_ztf_sim',
+            'bin/analyze_ztf_sim',
+            'bin/load_ztf_sim',
+            'bin/run_ls4_sim',
+            'bin/analyze_ls4_sim',
+            'bin/load_ls4_sim',
+            'bin/plot_ls4_sim',
+        ],
         classifiers=[
                      'Intended Audience :: Science/Research',
                      'Programming Language :: Python :: 3.6',
@@ -99,4 +107,3 @@ if __name__ == "__main__":
                      'Operating System :: Unix',
                      'Operating System :: MacOS'],
           )
-
