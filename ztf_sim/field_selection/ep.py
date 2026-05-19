@@ -17,6 +17,8 @@ from astropy.time import Time
 from astropy.coordinates import get_sun
 
 from astroplan import FixedTarget, Observer, Constraint, is_observable, min_best_rescale,AirmassConstraint
+import logging
+from ..constants import READOUT_TIME, P48_Observer
 
 from ..Fields import Fields
 from ..constants import READOUT_TIME
@@ -105,9 +107,9 @@ def make_ep_blocks(time_now, time_allowed, time_limit=300*u.second,
     df_ep_fov['end_mjd'] = [Time(d).mjd for d in df_ep_fov['end_date_UTC']]
     df_ep_fov['tobs_sec'] = (df_ep_fov['end_mjd'] - df_ep_fov['start_mjd']) * 24* 3600.
 
-    palomar = Observer.at_site('palomar')
+    palomar = Observer.at_site('La Silla')
     dayfrac = time_now.mjd % np.floor(time_now.mjd)
-    # Palomar sunset is after zero UTC 
+    # La Silla sunset timing
     time_zero_utc = Time(np.floor(time_now.mjd), format='mjd')
     if dayfrac > 0.5: 
         # we're in the daytime, try for tonight 

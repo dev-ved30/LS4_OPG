@@ -12,18 +12,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(inspect.getfile(
                 inspect.currentframe()))) + '/'
 
 
-P48_loc = coords.EarthLocation(lat=coords.Latitude('33d21m26.2s'),
-                               lon=coords.Longitude('-116d51m35.5s'),
-                               height=1707.)
+# La Silla Schmidt Observatory, Chile
+# Coordinates from ESO La Silla website
+P48_loc = coords.EarthLocation(lat=coords.Latitude('-29d0m30s'),
+                               lon=coords.Longitude('-70d43m52s'),
+                               height=2400.)
 
 # use UTC only
 P48_Observer = astroplan.Observer(location=P48_loc)
 
-# HA and Dec from http://www.oir.caltech.edu/twiki_oir/bin/view/Palomar/ZTF/TelescopeSpecifications v5
-# Dome estimate from Jeff Z email, 9/21/15
-# goals info from Jeff Z email, 12/12/16
-# Ha/Dec from Telescope Drive Performance Assessment v1.2; dome estimate from
-# Jeff Z. email, 9/27/17
+# LS4 slew parameters
+# Based on La Silla Schmidt telescope specifications
 P48_slew_pars = {
     'ha': {'coord': 'ra', 'accel': 0.4 * u.deg * u.second**(-2.),
            'decel': 0.4 * u.deg * u.second**(-2.),

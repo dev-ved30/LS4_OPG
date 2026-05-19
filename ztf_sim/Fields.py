@@ -37,14 +37,14 @@ class Fields(object):
         Sky brightness model used in observability calculations.
     """
 
-    def __init__(self, field_filename=BASE_DIR + '../data/ZTF_Fields.txt'):
-        """Load the ZTF field grid from disk.
+    def __init__(self, field_filename=BASE_DIR + '../data/LS4_Fields.txt'):
+        """Load the LS4 field grid from disk.
 
         Parameters
         ----------
         field_filename : str, optional
-            Path to the ZTF field grid text file (space-delimited, with a
-            header row). Defaults to ``data/ZTF_Fields.txt`` relative to the
+            Path to the LS4 field grid text file (space-delimited, with a
+            header row). Defaults to ``data/LS4_Fields.txt`` relative to the
             package root.
         """
         self._load_fields(field_filename)
@@ -66,7 +66,7 @@ class Fields(object):
         Parameters
         ----------
         field_filename : str
-            Path to the ZTF field grid text file. Expected columns (after
+            Path to the LS4 field grid text file. Expected columns (after
             skipping the header): ``field_id``, ``ra``, ``dec``, ``ebv``,
             ``l``, ``b``, ``ecliptic_lon``, ``ecliptic_lat``, ``number``.
         """

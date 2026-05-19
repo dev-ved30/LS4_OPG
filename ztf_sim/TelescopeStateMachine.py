@@ -67,6 +67,7 @@ class TelescopeStateMachine(Machine):
             Starting hour angle. Default is 0 deg (on meridian).
         current_dec : astropy.units.Quantity, optional
             Starting declination. Default is 33.36 deg (Palomar latitude).
+            Starting declination. Default is -29.01 deg (La Silla latitude).
         current_domeaz : astropy.units.Quantity, optional
             Starting dome azimuth. Default is 180 deg (south).
         current_filter_id : int, optional

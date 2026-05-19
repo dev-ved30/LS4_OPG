@@ -131,7 +131,7 @@ def SRG_pointing(tnow):
     ----------
     tnow : astropy.time.Time
         Any time within the night of interest. The Sun position is evaluated
-        at Palomar midnight (UTC 07:00).
+        at La Silla midnight (UTC 04:00).
 
     Returns
     -------
@@ -151,8 +151,8 @@ def SRG_pointing(tnow):
     ----------
     SRG real-time tracking: http://plan.srg.cosmos.ru/monthplan/tracking
     """
-    # Palomar midnight = UTC 7am
-    midnight_mjd = np.floor(tnow.mjd) + 7/24.
+    # La Silla midnight = UTC 4am (UTC-4 timezone)
+    midnight_mjd = np.floor(tnow.mjd) + 4/24.
     sunpos = get_sun(Time(midnight_mjd, format='mjd'))
     sun_ra_rad = sunpos.ra.rad
     sub_dec_rad = sunpos.dec.rad
