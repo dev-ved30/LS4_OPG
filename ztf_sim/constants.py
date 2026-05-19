@@ -55,9 +55,9 @@ P48_slew_pars_goal = {
 #             'decel': 0.6 * u.deg * u.second**(-2.),
 #             'vmax': 3. * u.deg / u.second}}
 
-EXPOSURE_TIME = 30. * u.second
-READOUT_TIME = 8. * u.second
-FILTER_CHANGE_TIME = 135. * u.second
+EXPOSURE_TIME = 60. * u.second
+READOUT_TIME = 40 * u.second
+FILTER_CHANGE_TIME = 0. * u.second
 SETTLE_TIME = 1. * u.second
 
 MAX_AIRMASS = 2.5
