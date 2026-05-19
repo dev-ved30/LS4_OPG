@@ -50,11 +50,11 @@ def check_dependencies():
     try:
         import sklearn
     except ImportError:
-        install_requires.append('sklearn')
+        install_requires.append('scikit-learn')
     try:
         import sklearn_pandas
     except ImportError:
-        install_requires.append('sklearn_pandas')
+        install_requires.append('sklearn-pandas')
     try:
         import xgboost
     except ImportError:
